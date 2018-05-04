@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+
+import urllib.request as urlreq
+from bs4 import BeautifulSoup
+import sys, re, codecs
+
+help_str = '''
+This is the help section for {}
+Make sure to use the whole url such as:
+
+http://www.google.com
+
+Beautiful Soup required to run
+if using ubuntu use:
+
+sudo apt install python-bs4
+
+there will be more info here soon
+'''.format(sys.argv[0])
+
+# set regex to distill <a href> URL's 
+# findlink = re.compile(r'\s+?\S+?[^\<a]+?<a href="([^"]+).*')
+
+
+def main(url):
+    
+    link_list = []
+    link_list_final = []
+    # attempt to call the user given URL to look for links
+    try:
+        headers = { 'User-Agent' : "Mozilla/5.0" }
+        req = urlreq.Request(url, None, headers)
+        html = urlreq.urlopen(req).read()
+
+    # Return user friendly error if web address is no good
+    except ValueError:
+        print('Invalid URL')
+        print('Use full url such as: https://www.google.com')
+
+    # Return generic error message if unexpected error occours
+    except:
+        print('Exception occurred! See exception info below')
+        print('Trying to load html doc\n')
+        print(sys.exc_info())
+        sys.exit()
+
+    
+    # Parse html code into workable document
+    html_soup = BeautifulSoup(html, 'html.parser')
+    
+    # find all links in html doc
+    for link in html_soup.find_all('a'):
+        link_list.append(link.get('href'))
+
+    # assemble links into http:// form
+    # discard unusable links
+    for link in link_list:
+        if link[0] == '/' and len(link) > 1:
+            link_list_final.append(url + link)
+
+        elif link[0:4].upper() == 'HTTP':
+            link_list_final.append(link)
+            link_list_final.sort()
+
+    # Write harvested links to file
+    with open(filename, 'a') as urltext: 
+        for line in link_list_final:
+            urltext.write(line + '\n')
+
+if __name__ == '__main__':
+    
+    # program INIT
+    if len(sys.argv) < 2:
+        # usage string if not enough arguments
+        print('Usage: {} <parent url to scan>'.format(sys.argv[0]))
+        print('Enter {} --help for more info'.format(sys.argv[0]))
+        sys.exit()
+
+    elif '--help' in sys.argv:
+        print(help_str)
+        sys.exit()
+
+    else:
+        try:
+            urlobj = re.match(r'[^.]+\.([^.]+\.[^\\]+)', sys.argv[1])
+            rooturl = sys.argv[1][urlobj.start(1):urlobj.end(1)]
+            filename = rooturl + '.txt'
+        except AttributeError:
+            print('Invalid URL')
+            print('Use full url such as: https://www.google.com')
+            sys.exit()
+
+        except:
+            print('Exception occurred! See exception info below')
+            print('Trying to extract root URL\n')
+            print(sys.exc_info())
+            sys.exit()
+
+    main(sys.argv[1])
+
