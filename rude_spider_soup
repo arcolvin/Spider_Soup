@@ -166,4 +166,3 @@ if __name__ == '__main__':
         with open(filepath + filename, 'a') as urltext: 
             for line in url_out:
                 urltext.write(line + '\n')
-
