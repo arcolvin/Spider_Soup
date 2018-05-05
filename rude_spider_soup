@@ -2,7 +2,7 @@
 
 import urllib.request as urlreq
 from bs4 import BeautifulSoup
-import sys, re, codecs, os
+import sys, re, os
 
 help_str = '''
 This is the help section for {}
@@ -21,57 +21,103 @@ results.
 there will be more info here soon
 '''.format(sys.argv[0])
 
-# set regex to distill <a href> URL's 
-# findlink = re.compile(r'\s+?\S+?[^\<a]+?<a href="([^"]+).*')
+def main(url, max_depth = 2, depth = 0, url_root = '', url_buff = [], visited = []):
 
-
-def main(url):
-    
     link_list = []
+    link_list_preprocess = []
+    link_list_ultimate = []
     link_list_final = []
-    # attempt to call the user given URL to look for links
-    try:
-        headers = { 'User-Agent' : "Mozilla/5.0" }
-        req = urlreq.Request(url, None, headers)
-        html = urlreq.urlopen(req).read()
+    visit = []
+    if depth <= max_depth and url not in visited:
+        visited.append(url)
 
-    # Return user friendly error if web address is no good
-    except ValueError:
-        print('Invalid URL')
-        print('Use full url such as: https://www.google.com')
+        # attempt to call the user given URL to look for links
+        try:
+            headers = { 'User-Agent' : "Mozilla/5.0" }
+            req = urlreq.Request(url, None, headers)
+            html = urlreq.urlopen(req).read()
 
-    # Return generic error message if unexpected error occours
-    except:
-        print('Exception occurred! See exception info below')
-        print('Trying to load html doc\n')
-        print(sys.exc_info())
-        sys.exit()
+        # Return user friendly error if web address is no good
+        except ValueError:
+            print('Invalid URL')
+            print('Use full url such as: https://www.google.com')
 
-    
-    # Parse html code into workable document
-    html_soup = BeautifulSoup(html, 'html.parser')
-    
-    # find all links in html doc
-    for link in html_soup.find_all('a'):
-        link_list.append(link.get('href'))
+        # Return generic error message if unexpected error occours
 
-    # assemble links into http:// form
-    # discard unusable links
-    for link in link_list:
-        if link[0] == '/' and len(link) > 1:
-            link_list_final.append(url + link)
+        except KeyboardInterrupt:
+            sys.exit()
+        
+        except:
+            print('Exception occurred! See exception info below')
+            print('Trying to build link list\n')
+            print(sys.exc_info())
+            return [], visited
 
-        elif link[0:4].upper() == 'HTTP':
-            link_list_final.append(link)
-            link_list_final.sort()
+        # Parse html code into workable document
+        html_soup = BeautifulSoup(html, 'html.parser')
 
-    # Write harvested links to file
-    with open(filepath + filename, 'a') as urltext: 
-        for line in link_list_final:
-            urltext.write(line + '\n')
+        # Print html to screen (optional)
+        # print(html_soup.prettify()) 
+
+        # find all links in html doc
+        for link in html_soup.find_all('a'):
+            link_list.append(link.get('href'))
+
+        # assemble links into http:// form
+        # discard unusable links
+        for link in link_list:
+            try:
+                if link[0] == '/' and len(link) > 1:
+                    if (url_root + link) not in link_list_final:
+                        link_list_final.append(url_root + link)
+
+                elif link[0:4].upper() == 'HTTP':
+                    if link not in link_list_final:
+                        link_list_final.append(link)
+
+                elif link[0] == '/' and len(link) == 1:
+                    pass
+
+                else:
+                    if (url_root + '/' + link) not in link_list_final:
+                        link_list_final.append(url_root + '/' + link)
+
+            except TypeError:
+                pass
+
+            except KeyboardInterrupt:
+                sys.exit()
+
+            except:
+                print('Exception occurred! See exception info below')
+                print('Trying to build link list\n')
+                print(sys.exc_info())
+                return [], visited
+
+
+        for link in link_list_final:
+            if link not in visited:
+                print('Depth: {} Link: {}'.format(depth, link))
+                link_list_preprocess, visit = main(link, max_depth, depth + 1, url_root, link_list_final, visited)
+            for itm in visit:
+                if itm not in visited:
+                    visited.append(itm)
+
+            for itm in link_list_preprocess:
+                if itm not in link_list_ultimate:
+                    link_list_ultimate.append(itm)
+
+            for itm in url_buff:
+                if itm not in link_list_ultimate:
+                    link_list_ultimate.append(itm)
+
+        return link_list_ultimate, visited
+
+    else:
+        visited.append(url)
+        return [url], visited
 
 if __name__ == '__main__':
-    
     # program INIT
     if len(sys.argv) < 2:
         # usage string if not enough arguments
@@ -96,6 +142,9 @@ if __name__ == '__main__':
             print('Use full url such as: https://www.google.com')
             sys.exit()
 
+        except KeyboardInterrupt:
+            sys.exit()
+
         except:
             print('Exception occurred! See exception info below')
             print('Trying to extract root URL\n')
@@ -109,6 +158,12 @@ if __name__ == '__main__':
         if not os.path.exists(filepath):
             os.makedirs(filepath)
 
-    # Run the parser
-    main(sys.argv[1])
+        # Call main function to run recursively and spider the web page
+        url_out, visited = main(sys.argv[1], url_root = sys.argv[1])
+        url_out.sort()
+
+        # Write harvested links to file
+        with open(filepath + filename, 'a') as urltext: 
+            for line in url_out:
+                urltext.write(line + '\n')
 
