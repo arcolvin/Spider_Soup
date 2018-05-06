@@ -67,18 +67,18 @@ def main(url, max_depth = 2, depth = 0, url_root = '', url_buff = [], visited = 
         for link in link_list:
             try:
                 if link[0] == '/' and len(link) > 1:
-                    if (url_root + link) not in link_list_final and (url_root + link) not in visited:
+                    if (url_root + link) not in link_list_final:
                         link_list_final.append(url_root + link)
 
-                elif link[0:4].upper() == 'HTTP' or link[0:3].upper() == 'FTP':
-                    if link not in link_list_final and link not in visited:
+                elif link[0:4].upper() == 'HTTP':
+                    if link not in link_list_final:
                         link_list_final.append(link)
 
                 elif link[0] == '/' and len(link) == 1:
                     pass
 
                 else:
-                    if (url_root + '/' + link) not in link_list_final and (url_root + '/' + link) not in visited:
+                    if (url_root + '/' + link) not in link_list_final:
                         link_list_final.append(url_root + '/' + link)
 
             except TypeError:
@@ -96,25 +96,22 @@ def main(url, max_depth = 2, depth = 0, url_root = '', url_buff = [], visited = 
 
         for link in link_list_final:
             if link not in visited:
-                print('Depth: {} Max: {} Link: {}'.format(depth, max_depth, link))
+                print('Depth: {} Link: {}'.format(depth, link))
                 link_list_preprocess, visit = main(link, max_depth, depth + 1, url_root, link_list_final, visited)
+            # WORK HERE NOW
+            for itm in visit:
+                if itm not in visited:
+                    visited.append(itm)
 
-                for itm in link_list_preprocess:
-                    if itm not in link_list_ultimate:
-                        link_list_ultimate.append(itm)
+            for itm in link_list_preprocess:
+                if itm not in link_list_ultimate:
+                    link_list_ultimate.append(itm)
 
-                for itm in url_buff:
-                    if itm not in link_list_ultimate:
-                        link_list_ultimate.append(itm)
-
-                for itm in visit:
-                    if itm not in visited:
-                        visited.append(itm)
+            for itm in url_buff:
+                if itm not in link_list_ultimate:
+                    link_list_ultimate.append(itm)
 
         return link_list_ultimate, visited
-
-    elif url in visited:
-        return [], visited
 
     else:
         visited.append(url)
@@ -160,6 +157,7 @@ if __name__ == '__main__':
                         print('Exception occurred! See exception info below')
                         print('Trying to build robo avoid list\n')
                         print(sys.exc_info())
+                print(robo_avoid)
 
             # Return user friendly error if web address is no good
             except ValueError:
@@ -215,7 +213,7 @@ if __name__ == '__main__':
             os.makedirs(filepath)
 
         # Call main function to run recursively and spider the web page
-        url_out, visited = main(args[0], max_depth, url_root = args[0], visited = robo_avoid)
+        url_out, visited = main(args[0], url_root = args[0], visited = robo_avoid)
         url_out.sort()
 
         # Write harvested links to file
