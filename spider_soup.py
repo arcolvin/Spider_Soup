@@ -5,14 +5,23 @@ from bs4 import BeautifulSoup
 import sys, re, os, codecs
 
 """
-List of todo's:
+Known Bugs:
 
-    figure out why depth scan isn't going as deep as it should
-        Hidden URL will print to terminal screen but will not 
-        load to final text doc
+    Polite spider does not respect extended robots.txt links
+        ex. if '/private.php' in robots.txt will respect
+        http://www.example.com/private.php
+        but will not respect
+        http://www.example.com/private.php/?do=newpm&u=1044475
+        or similar web addresses
 
-    Continue to clean up code (as always)
+        We place any robots.txt exclusions into a visited list and refer
+        statically to those list items. Maybe use regex to dynamically 
+        look at the robotxt exclusions. This could also help with robo 
+        entries such as '/clientscript/*.css' where there are dynamic links
+        permitted or denied
+
 """
+
 help_str = '''
 
 This is the help section for {}
@@ -143,14 +152,21 @@ def main(url, max_depth, depth = 0, url_root = '', url_buff = [], visited = [], 
                 print('Depth: {} Max: {} Link: {}'.format(depth, max_depth, link))
                 link_list_preprocess, visit = main(link, max_depth, depth + 1, url_root, link_list_final, visited, robots, rude)
 
+                # Add processed link to final link list
+                if link not in link_list_ultimate:
+                    link_list_ultimate.append(link)
+
+                # Add any found sub links to final link list
                 for itm in link_list_preprocess:
                     if itm not in link_list_ultimate:
                         link_list_ultimate.append(itm)
 
+                # Used to cary link_list_final from one level to another
                 for itm in url_buff:
                     if itm not in link_list_ultimate:
                         link_list_ultimate.append(itm)
 
+                # Used to carry visited list from one recursion level to another
                 for itm in visit:
                     if itm not in visited:
                         visited.append(itm)
