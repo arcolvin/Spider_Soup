@@ -7,9 +7,9 @@ import sys, re, os, codecs
 """
 List of todo's:
 
-    figure out why depth scan isnt going as deep as it should
-        Hidden url will print to terminal screen but will not 
-        load to final txt doc
+    figure out why depth scan isn't going as deep as it should
+        Hidden URL will print to terminal screen but will not 
+        load to final text doc
 
     Continue to clean up code (as always)
 """
@@ -19,22 +19,22 @@ This is the help section for {}
 There are 2 extra options available to you:
 
 -m <#>          Use flag -m to change maximum scan depth.
-                Give an intiger value to define max depth.
-                Reccomended and default max is 2.
+                Give an integer value to define max depth.
+                Recommended and default max is 2.
 
--r              This flag will make the spider ignore robots.txt.
+-r              This flag will make the spider ignore robots.txt
 
 
-Make sure to provide the whole url such as:
+Make sure to provide the whole URL such as:
 
 https://www.google.com
 
-Beautiful Soup required to run. If using ubuntu you can install it with:
+Beautiful Soup required to run. If using Ubuntu you can install it with:
 
 sudo apt install python-bs4
 
 A text file located within ~/Spider_Soup/ will be written with your results.
-The text file should have the domain name for the root webpage scanned.
+The text file should have the domain name for the root web page scanned.
 
 command ex. {} http://www.example.com -m 2 -r
             {} -r http://www.example.com -m 3
@@ -77,17 +77,17 @@ def main(url, max_depth, depth = 0, url_root = '', url_buff = [], visited = [], 
         except KeyboardInterrupt:
             sys.exit()
         
-        # Return generic error message if unexpected error occours
+        # Return generic error message if unexpected error occurs
         except:
             print('\nException occurred while trying to build HTML doc')
             print('Working with {}\n'.format(url))
             print('\n', sys.exc_info(), '\n')
             return [], visited
 
-        # Parse html code into workable document
+        # Parse HTML code into workable document
         html_soup = BeautifulSoup(html, 'html.parser')
 
-        # find all links in html doc
+        # find all links in HTML doc
         for link in html_soup.find_all('a'):
             link_list.append(link.get('href'))
 
@@ -95,7 +95,7 @@ def main(url, max_depth, depth = 0, url_root = '', url_buff = [], visited = [], 
         # discard unusable links
         for link in link_list:
             try:
-                # look for relitive links ex. /index.html
+                # look for relative links ex. /index.html
                 if link[0] == '/' and len(link) > 1:
                     if (url_root + link) not in link_list_final and (url_root + link) not in visited:
                         link_list_final.append(url_root + link)
@@ -105,7 +105,7 @@ def main(url, max_depth, depth = 0, url_root = '', url_buff = [], visited = [], 
                     if link not in link_list_final and link not in visited:
                         link_list_final.append(link)
 
-                        # If given absolute url, respect robots.txt
+                        # If given absolute URL, respect robots.txt
                         if url_root not in robots and rude == False:
                             robo_avoid = robo_text(link)
                             for itm in robo_avoid:
@@ -117,13 +117,13 @@ def main(url, max_depth, depth = 0, url_root = '', url_buff = [], visited = [], 
                 elif link[0] == '/' and len(link) == 1:
                     continue
 
-                # look for relitive links not starting in "/" ex. index.php
+                # look for relative links not starting in "/" ex. index.php
                 else:
                     if (url_root + '/' + link) not in link_list_final and (url_root + '/' + link) not in visited:
                         link_list_final.append(url_root + '/' + link)
 
             except TypeError:
-                # go to next link in loop if error occourrs
+                # go to next link in loop if error occurs
                 continue
 
             except KeyboardInterrupt:
@@ -184,7 +184,7 @@ def robo_text(url):
                 print('\nException occurred while building robo avoid list.\n')
                 print('\n', sys.exc_info(), '\n')
 
-    # Return error if robots.txt url is bad
+    # Return error if robots.txt URL is bad
     except ValueError:
         print('\nInvalid URL found while parsing robots.txt')
         print('working with: {}\n'.format(url))
@@ -193,7 +193,7 @@ def robo_text(url):
     except KeyboardInterrupt:
         sys.exit()
     
-    # Return generic error message if unexpected error occours
+    # Return generic error message if unexpected error occurs
     except:
         print('\nException occurred while reading robot.txt')
         print('working with: {}\n'.format(url))
@@ -246,7 +246,7 @@ if __name__ == '__main__':
             robots.append(args[0])
 
         try:
-            # extract root url ex. http://www.google.com -> google.com
+            # extract root URL ex. http://www.google.com -> google.com
             rooturl = url_regex(args[0],2 ,2)
             # Create filename ex. google.com -> google.com.txt
             filename = rooturl + '.txt'
