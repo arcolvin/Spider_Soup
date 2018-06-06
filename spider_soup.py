@@ -20,6 +20,18 @@ Known Bugs:
         entries such as '/clientscript/*.css' where there are dynamic links
         permitted or denied
 
+Planned Code imporovements:
+    Contain the passed variables inside a dictionary
+
+    Make the error handling better.
+
+    Split main function into more functions.
+
+    Set the program to be threaded.
+        limit maximum number of threads.
+
+    look into argparse
+
 """
 
 help_str = '''
@@ -245,6 +257,7 @@ if __name__ == '__main__':
         robots = []
         rude = False
         args = sys.argv[1:]
+        path_exists = True
 
         # Look for custom max scan depth
         if '-m' in args:
@@ -264,8 +277,6 @@ if __name__ == '__main__':
         try:
             # extract root URL ex. http://www.google.com -> google.com
             rooturl = url_regex(args[0],2 ,2)
-            # Create filename ex. google.com -> google.com.txt
-            filename = rooturl + '.txt'
         except AttributeError:
             print('Invalid URL')
             print('Use full url such as: https://www.google.com')
@@ -290,8 +301,19 @@ if __name__ == '__main__':
         # Sort output for writing to final file
         url_out.sort()
 
+        # Create alternate filenames if file exists already
+        num = ''
+        idx = 2
+        while path_exists == True:
+            if os.path.exists(filepath + rooturl + num + '.txt'):
+                num = '(' + str(idx) + ')'
+                idx += 1
+
+            else:
+                file_out = filepath + rooturl + num + '.txt'
+                path_exists = False
+
         # Write harvested links to file
-        with open(filepath + filename, 'a') as urltext: 
+        with open(file_out, 'a') as urltext: 
             for line in url_out:
                 urltext.write(line + '\n')
-
