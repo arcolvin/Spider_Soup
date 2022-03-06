@@ -23,13 +23,10 @@ def scrape(url):
     # print(matches)
     return fixed
 
-res = scrape('https://ford.com')
+res = list(set(scrape('https://dinkyouverymuch.com')))
 
-fin = set()
+res.sort()
 
-for x in res:
-    fin.add(x)
-
-
-for x in fin:
-    print(scrape(x))
+with open('spiderOut.txt', 'w') as f:
+    for x in res:
+        f.write(x + "\n")
