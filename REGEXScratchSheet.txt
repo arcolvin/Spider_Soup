@@ -28,4 +28,4 @@ href=[\'|\"]((?:https?|telnet|ldaps?|ftps?)\:\/\/)([\w|\d|\.|\:]+)(\/?.*)[\'|\"]
 
 
 Path Only Match (Relative links)
-href=[\'|\"](?:(?!https?|telnet|ldaps?|ftps?))\/?[\w|\d|\.]+[\'|\"]
+href=[\'|\"](?:(?!https?|telnet|ldaps?|ftps?))(\/?[\w|\d|\.]+)[\'|\"]
