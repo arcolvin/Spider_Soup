@@ -16,11 +16,11 @@ Known Bugs:
 
         We place any robots.txt exclusions into a visited list and refer
         statically to those list items. Maybe use regex to dynamically 
-        look at the robotxt exclusions. This could also help with robo 
+        look at the robots.txt exclusions. This could also help with robo 
         entries such as '/clientscript/*.css' where there are dynamic links
         permitted or denied
 
-Planned Code imporovements:
+Planned Code improvements:
     Contain the passed variables inside a dictionary
 
     Make the error handling better.
@@ -71,7 +71,7 @@ Thank you for using Spider_Soup!
 # most if not all should be overwritten as the program runs
 def main(url, max_depth, depth = 0, url_root = '', url_buff = [], visited = [], robots = [], rude = False):
 
-    # reinit all variables for each recursion
+    # re-init all variables for each recursion
     link_list = []
     link_list_preprocess = []
     link_list_ultimate = []
