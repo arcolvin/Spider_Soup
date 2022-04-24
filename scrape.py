@@ -106,22 +106,8 @@ if __name__ == '__main__':
             crawler.visited = crawler.robo_text(args[0])
             crawler.robots.append(args[0])
 
-        try:
-            # extract root URL ex. http://www.google.com -> google.com
-            rooturl = crawler.url_regex(args[0],2 ,2)
-        except AttributeError:
-            print('Invalid URL')
-            print('Use full url such as: https://www.google.com')
-            sys.exit()
-
-        except:
-            print('Exception occurred! See exception info below')
-            print('Trying to extract root URL\n')
-            print(sys.exc_info())
-            sys.exit()
-
         # Call main function to run recursively and spider the web page
-        urls, visited = crawler.scrape()
+        urls, visited = crawler.crawl()
 
         # Sort output for writing to final file
         list(urls)

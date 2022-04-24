@@ -16,7 +16,7 @@ class spider:
         self.final = set()
         self.working = set()
         self.maxDepth = 2
-        self.roboAvoid = []
+        self.roboAvoid = set()
         self.robots = []
         self.rude = False
         self.root = []
@@ -24,28 +24,38 @@ class spider:
         self.visited = []
         
 
-    def scrape(url):
+    def crawl(self):
+        pass
+
+
+    def scrape(self, url):
+        # Get HTML
         r = requests.get(url)
-        matches = re.findall(r'href=[\'|\"](\S*)[\'|\"]', r.text)
-        fixed = []
-        for x in matches:
-            try:
-                if x[0] == '/':
-                    fixed.append(f'{url}{x}')
-                    
-                elif x[0:4] == 'http':
-                    fixed.append(x)
+        
+        # Find full URLs in the HTML
+        matches = set(re.findall(r'[\'\"]((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:]+\/?.*?)(?:\?.*?)?[\'\"]', r.text))
+        
+        # Find relative matches in HTML
+        relativeMatches = set(re.findall(r'[\'\"](?:(?!https?|telnet|ldaps?|ftps?))(\/?[\w|\d|\.]+)[\'\"]', r.text))
+
+        # Identify base URL for relative link fix
+        baseUrlMatch = re.match(r'((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:]+)\/?.*?', url)
+        baseURL = url[baseUrlMatch.start(1):baseUrlMatch.end(1)]
+
+        # Make relative matches into full matches for processing
+        # Add to main matches set
+        for match in relativeMatches:
+            if match[0] == '/':
+                matches.add(baseURL + match)
                 
-                else:
-                    pass
-            except IndexError:
-                pass
+            else:
+                matches.add(baseURL + '/' + match)
 
         # print(matches)
-        return fixed
+        return matches
 
 
-    def robo_text(url):
+    def robo_text(self, url):
         robo_avoid = []
         # Attempt to call the URL to find robot.txt entries
         try:
@@ -81,14 +91,6 @@ class spider:
             print('\n', sys.exc_info(), '\n')
 
         return robo_avoid
-
-
-    def url_regex(url, st, end):
-        # regex for pulling out different parts of the given URL
-        # ex. (1)(http://www.) (2)(example.com) (3)(/index.html)
-        urlobj = re.match(r'((?:https?|ftp)://(?:[a-zA-Z]+\.)?)([^/\r\n]+)(/[^\r\n]*)?', url)
-        rooturl = url[urlobj.start(st):urlobj.end(end)]
-        return rooturl
 
 
 if __name__ == '__main__':
