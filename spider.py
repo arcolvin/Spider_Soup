@@ -49,17 +49,15 @@ class spider():
         log.debug(f'baseURL: {self.baseURL}')
         log.debug(f'currentURL: {self.currentURL}')
 
-    def crawl(self, url):
+    def crawl(self):
         # process for navigating to and collecting new HTML object
         # should stop if maximum depth reached
         # should save HTML object to class
         
-        # Extract base URL for relative URL rebuilding
-        #self.baseURL = re.
 
-        log.info(f'Requesting HTML for: {url}')
+        log.info(f'Requesting HTML for: {self.currentURL}')
         
-        self.html = requests.get(url)
+        self.html = requests.get(self.currentURL)
 
         log.debug('HTML collected with http status code' + \
                   f' of {self.html.status_code}')
@@ -71,21 +69,28 @@ class spider():
         # Process for reading and extracting data from HTML object
         # TODO Allow user to provide custom REGEX for custom data extraction
         
+        # REGEX for base URL
+        REGEX0 = r'((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:]+)\/?.*?' 
+        # REGEX for full URLs
+        REGEX1 = r'((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:]+\/?.*?)'+\
+                r'(?:\?.*?)?'
+        # REGEX for relative URLs
+        REGEX2 = r'((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:]+\/?.*?)'
+        
+        # rstrip a slash if it exists, then add one in
+        # guarantees there is exactly one / on the base url for concatenation
+        # with a relative url path
+        self.baseURL = re.search(REGEX0 , s.currentURL).group().rstrip('/') + '/'
+        log.debug(f'BaseURL identified: {self.baseURL}')
 
 
-        matches = re.findall(r'href=[\'|\"](\S*)[\'|\"]', self.html.text)
-        for x in matches:
-            try:
-                if x[1] == '/':
-                    self.queue.add(f'{self.baseURL}{x}')
-                    
-                elif x[1:4] == 'http':
-                    self.queue.add(x)
-                
-                else:
-                    pass
-            except IndexError:
-                pass
+        fullURLs = re.findall(REGEX1, self.html.text)
+        relativeURLs = re.findall(REGEX2, self.html.text)
+        for x in fullURLs:
+            self.queue.add(x)
+
+        for x in relativeURLs:
+            self.queue.add(self.baseURL + x.lstrip('/'))
 
         return None
 
@@ -110,11 +115,12 @@ if __name__ == '__main__':
     logging.basicConfig(level='DEBUG')
 
     # Hardcode starting URL for testing
-    startURL = 'https://google.com'
+    startURL = 'https://example.com'
 
     # Spider instance for testing
     s = spider()
+    s.currentURL = startURL
 
     # TODO: Eventually this will need to be wrapped in a while loop
     # so that it can continue processing until we identify an exit point
-    s.crawl(startURL)
+    s.crawl()
