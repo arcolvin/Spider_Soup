@@ -44,7 +44,10 @@ def helpMsg(fn):
     '''
     return help_str
 
-def writeOut(url_out):
+def writeOut(url_out, startURL):
+    # URL out is the data structure holding all of the collected URLs
+    # Start URL is the URL originally provided by the user at program start
+
     # Create full path to users home folder and output directory
     filepath = os.path.expanduser('~/Spider_Soup/')
     path_exists = True
@@ -56,12 +59,12 @@ def writeOut(url_out):
     num = ''
     idx = 2
     while path_exists == True:
-        if os.path.exists(f'{filepath}{rooturl}{num}.txt'):
+        if os.path.exists(f'{filepath}{startURL}{num}.txt'):
             num = f'({str(idx)})'
             idx += 1
 
         else:
-            file_out = f'{filepath}{rooturl}{num}.txt'
+            file_out = f'{filepath}{startURL}{num}.txt'
             path_exists = False
 
     # Write harvested links to file
