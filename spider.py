@@ -1,100 +1,59 @@
 #!/usr/bin/env python3
-# Version: 0.1
+# Version 0.1
+'''
+This web spider will crawl the WWW and collect data as needed.
 
-import requests
-import re
-import sys
+Its baseline behavior is to collect URL's with a given recursive depth
+and save this to a local file.
 
-"""
-Notes:
+Future versions will grant an option for a user to provide a custom
+REGEX string to collect additional data.
+'''
 
-"""
+import logging
 
-class spider:
+# This allows for logs to work even if class is imported
+# all log events in this script should be called as
+# log.LEVEL('Log Message')
+log = logging.getLogger(__name__)
+
+class spider():
     def __init__(self):
-        # TODO: Set comments to explain these
-        self.final = set()
-        self.working = set()
-        self.maxDepth = 2
-        self.roboAvoid = set()
-        self.robots = []
-        self.rude = False
-        self.root = []
-        self.pthExist = True
-        self.visited = []
+        # Provide initial variables for scraping use
         
+        # Active HTML object
+        # URL Processing Queue
+        # Processed URL list (for final Export)
+        # current depth
+        # Max Depth
+        # base URL for active HTML Object
+            # For robots.txt tracking
+            # Also for relative link buildout
+        pass
 
     def crawl(self):
+        # process for navigating to and collecting new HTML object
+        # should stop if maximum depth reached
+        pass
+
+    def scrape(self):
+        # Process for reading and extracting data from HTML object
+        # TODO Allow user to provide custom REGEX for custom data extraction
+        pass
+
+    def robot(self):
+        # process to call in and remove robots.txt values from processing queue
         pass
 
 
-    def scrape(self, url):
-        # Get HTML
-        r = requests.get(url)
-        
-        # Find full URLs in the HTML
-        matches = set(re.findall(r'[\'\"]((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:]+\/?.*?)(?:\?.*?)?[\'\"]', r.text))
-        
-        # Find relative matches in HTML
-        relativeMatches = set(re.findall(r'[\'\"](?:(?!https?|telnet|ldaps?|ftps?))(\/?[\w|\d|\.]+)[\'\"]', r.text))
-
-        # Identify base URL for relative link fix
-        baseUrlMatch = re.match(r'((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:]+)\/?.*?', url)
-        baseURL = url[baseUrlMatch.start(1):baseUrlMatch.end(1)]
-
-        # Make relative matches into full matches for processing
-        # Add to main matches set
-        for match in relativeMatches:
-            if match[0] == '/':
-                matches.add(baseURL + match)
-                
-            else:
-                matches.add(baseURL + '/' + match)
-
-        # print(matches)
-        return matches
-
-
-    def robo_text(self, url):
-        robo_avoid = []
-        # Attempt to call the URL to find robot.txt entries
-        try:
-            headers = { 'User-Agent' : "Mozilla/5.0" }
-            req = urlreq.Request(url + '/robots.txt', None, headers)
-            html = urlreq.urlopen(req)
-            for line in html:
-                robo_rule = ''
-                robo_obj = re.match(r'[^\/]+(\/\S+)', line.decode('unicode_escape'))
-                try:
-                    robo_rule = line[robo_obj.start(1):robo_obj.end(1)].decode('unicode_escape')
-                    robo_avoid.append(url + robo_rule)
-                except AttributeError:
-                    # skip blank lines or lines with no rules to match
-                    continue
-                except:
-                    print('\nException occurred while building robo avoid list.\n')
-                    print('\n', sys.exc_info(), '\n')
-
-        # Return error if robots.txt URL is bad
-        except ValueError:
-            print('\nInvalid URL found while parsing robots.txt')
-            print('working with: {}\n'.format(url))
-            print('\n', sys.exc_info(), '\n')
-
-        except KeyboardInterrupt:
-            sys.exit()
-        
-        # Return generic error message if unexpected error occurs
-        except:
-            print('\nException occurred while reading robot.txt')
-            print('working with: {}\n'.format(url))
-            print('\n', sys.exc_info(), '\n')
-
-        return robo_avoid
-
-
 if __name__ == '__main__':
-    print('This is intended to be imported into another script ' + \
-          'and used as the heart of a scraping program.')
-    print('Import this into a script and try again')
+    # Driver code for local testing
+    '''
+    Should be implimented into another script to match required processes
+    for the specified use case
+
+    Default action is to do 2 layers of scraping for testing
+    '''
     
+    # Log to terminal for testing
+    logging.basicConfig(level='DEBUG')
