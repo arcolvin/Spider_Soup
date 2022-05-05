@@ -36,6 +36,10 @@ class spider():
         self.nextqueue = set()
         # Processed URL list (for final Export)
         self.visited = set()
+        # Robots.txt deny set
+        self.deny = set()
+        # Robots.txt allow set
+        self.allow = set()
         # current depth
         self.depth = 0
         # Max Depth
@@ -52,6 +56,8 @@ class spider():
         log.debug(f'queue: {self.queue}')
         log.debug(f'next queue: {self.nextqueue}')
         log.debug(f'visited: {self.visited}')
+        log.debug(f'deny: {self.deny}')
+        log.debug(f'allow: {self.allow}')
         log.debug(f'depth: {self.depth}')
         log.debug(f'maxdepth: {self.maxdepth}')
         log.debug(f'baseURL: {self.baseURL}')
@@ -90,24 +96,13 @@ class spider():
             return None
 
         else:
-            # REGEX for base URL
-            base_R = r'((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:]+)\/?.*?' 
-            # REGEX for full URLs
-            full_R = r'href=[\'\"]((?:https?|telnet|ldaps?|ftps?)' + \
-                    r'\:\/\/[\w|\d|\.|\:]+\/?.*?)(?:\?.*?)?[\'\"]'
-            # REGEX for relative URLs
-            rel_R = r'href=[\'\"](?:(?!https?|telnet|ldaps?|ftps?))' +\
-                    r'(\/?[\w|\d|\.]+)[\'\"]'
-            
-            # rstrip a slash if it exists, then add one in
-            # guarantees there is exactly one / on the base url for concatenation
-            # with a relative url path
-            self.baseURL = re.search(base_R , s.currentURL).group().rstrip('/') + '/'
+            # Identify base URL of current processed URL            
+            self.baseURL = self.base(self.currentURL)
             log.debug(f'BaseURL identified: {self.baseURL}')
 
             # Collect lists of all found full and relative URLS
-            fullURLs = re.findall(full_R, self.html.text)
-            relativeURLs = re.findall(rel_R, self.html.text)
+            fullURLs = self.full(self.html.text)
+            relativeURLs = self.rel(self.html.text)
             
             # Process these lists and save values to queue
             log.info("Adding found URL's to next queue")
@@ -149,6 +144,15 @@ class spider():
             # Remove visited URLs from current queue to avoid duplicate visits
             self.queue -= self.visited
             # TODO also remove robots.txt values (see self.robot())
+            '''
+            # I dont like this solution but i need to sort it out
+            # possibly compare related values to a starts with
+            # i.e. if queue element starts with allow leave it
+            # elif queue item starts with deny remove it... ect
+            for x in self.queue:
+                for y in self.allow:
+                    al
+            '''
 
             # prepare next URL for processing
             self.currentURL = self.queue.pop()
@@ -166,13 +170,83 @@ class spider():
         return True
 
 
-    def robot(self):
+    def base(self, url):
+        '''
+        Method to find the base URL from a provided URL string
+        expects a string returns a string
+        '''
+        # REGEX for base URL
+        base_R = r'((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:]+)\/?.*?' 
+
+        # rstrip a slash if it exists, then add one in
+        # guarantees there is exactly one / on the base url for concatenation
+        # with a relative url path
+        return re.search(base_R , url).group().rstrip('/') + '/'
+
+
+    def full(self, html):
+        '''
+        Method to find all of the full URLs from a provided html text
+        Expects html text passed via argument
+        returns a list of strings
+        '''
+        full_R = r'href=[\'\"]((?:https?|telnet|ldaps?|ftps?)' + \
+                r'\:\/\/[\w|\d|\.|\:]+\/?.*?)(?:\?.*?)?[\'\"]'
+
+        # Collect lists of all found full and relative URLS
+        return re.findall(full_R, html)
+
+
+    def rel(self, html):
+        '''
+        Method to find all of the URLs from a provided html text
+        Expects html text passed via argument
+        returns a list of strings
+        '''
+        # REGEX for relative URLs
+        rel_R = r'href=[\'\"](?:(?!https?|telnet|ldaps?|ftps?))' +\
+                r'(\/?[\w|\d|\.]+)[\'\"]'
+        
+        return re.findall(rel_R, html)
+
+
+    def robot(self, url):
         '''
         Process to call in and remove robots.txt values from processing queue
         Should look at all base urls from current queue
         '''
         # NOTE: Maybe put all queue base URLs in a temporary set to ensure
         #       we don't visit a given txt twice 
+
+        # Find base URL for element at hand
+        base = self.base(url)
+
+        log.info(f'Requesting robots.txt for: {base}')
+        
+        # Request the robots.txt of the base URL
+        roboHTML = requests.get(base + 'robots.txt')
+            
+        log.debug('robots.txt collected with http status code' + \
+                f' of {roboHTML.status_code}')
+        log.debug(f'Apparent encoding: {roboHTML.apparent_encoding}')
+
+        allow = set()
+        deny = set()
+        
+        # Parse robots.txt looking for allow and deny values
+        for line in roboHTML.text:
+            if line.upper().startswith('ALLOW'):
+                allow.add(base + line.split(' ')[1])
+
+            elif line.upper().startswith('DISALLOW'):
+                deny.add(base + line.split(' ')[1])
+
+        log.debug(f'Robots.txt parsed for {base}')
+        log.debug(f'Robots.txt allow set for {base}: {allow}')
+        log.debug(f'Robots.txt deny set for {base}: {deny}')
+        
+        self.allow.update(allow)
+        self.deny.update(deny)
 
         return None
 
@@ -206,7 +280,8 @@ class spider():
                 again = self.nextURL()
 
         except KeyboardInterrupt:
-            print('Stopping Spider and reporting findings')
+            log.info('Keyboard Inturrupt. ' + \
+                     'Stopping Spider and reporting findings')
             self.visited.update(self.queue)
             self.visited.update(self.nextqueue)
 
@@ -229,10 +304,12 @@ if __name__ == '__main__':
     logging.basicConfig(level='DEBUG')
 
     # Hardcode starting URL for testing
-    startURL = 'https://example.com'
+    startURL = 'https://google.com'
 
     # Spider instance for testing
     s = spider()
-    s.maxdepth = 5
 
-    s.auto(startURL)
+    # for auto config and testing
+    # s.maxdepth = 5
+    # s.auto(startURL)
+    s.robot()
