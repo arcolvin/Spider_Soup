@@ -40,6 +40,8 @@ class spider():
         self.deny = set()
         # Robots.txt allow set
         self.allow = set()
+        # For tracking visited robots.txt pages
+        self.roboVisited = set ()
         # current depth
         self.depth = 0
         # Max Depth
@@ -58,6 +60,7 @@ class spider():
         log.debug(f'visited: {self.visited}')
         log.debug(f'deny: {self.deny}')
         log.debug(f'allow: {self.allow}')
+        log.debug(f'roboVisited: {self.roboVisited}')
         log.debug(f'depth: {self.depth}')
         log.debug(f'maxdepth: {self.maxdepth}')
         log.debug(f'baseURL: {self.baseURL}')
@@ -143,16 +146,9 @@ class spider():
 
             # Remove visited URLs from current queue to avoid duplicate visits
             self.queue -= self.visited
+
             # TODO also remove robots.txt values (see self.robot())
-            '''
-            # I dont like this solution but i need to sort it out
-            # possibly compare related values to a starts with
-            # i.e. if queue element starts with allow leave it
-            # elif queue item starts with deny remove it... ect
-            for x in self.queue:
-                for y in self.allow:
-                    al
-            '''
+            self.robot()
 
             # prepare next URL for processing
             self.currentURL = self.queue.pop()
@@ -190,8 +186,8 @@ class spider():
         Expects html text passed via argument
         returns a list of strings
         '''
-        full_R = r'href=[\'\"]((?:https?|telnet|ldaps?|ftps?)' + \
-                r'\:\/\/[\w|\d|\.|\:]+\/?.*?)(?:\?.*?)?[\'\"]'
+        full_R = r'href=[\'\"]((?:https?|telnet|ldaps?|ftps?)' +\
+                 r'\:\/\/[\w|\d|\.|\:]+\/?.*?)[\'\"]'
 
         # Collect lists of all found full and relative URLS
         return re.findall(full_R, html)
@@ -210,43 +206,77 @@ class spider():
         return re.findall(rel_R, html)
 
 
-    def robot(self, url):
+    def robot(self, queue=None):
         '''
         Process to call in and remove robots.txt values from processing queue
-        Should look at all base urls from current queue
+        With Auto this will look at all URLs in the current queue during the
+        cleanup phase of the next URL function
+
+        Expects an iterable set of URLs
+        saves found robots exclusions to self.allow and self.deny
+        also curates the queue to elimitante denied paths
         '''
         # NOTE: Maybe put all queue base URLs in a temporary set to ensure
         #       we don't visit a given txt twice 
 
+        # Initialize queue if no paramater provided
+        if queue == None:
+            queue = self.queue
+
         # Find base URL for element at hand
-        base = self.base(url)
+        for url in queue:
+            if self.base(url) in self.roboVisited:
+                continue
 
-        log.info(f'Requesting robots.txt for: {base}')
+            else:
+                base = self.base(url)
+
+                log.info(f'Requesting robots.txt for: {base}')
+                
+                # Request the robots.txt of the base URL
+                roboHTML = requests.get(base + 'robots.txt')
+                self.roboVisited.add(base)
+                    
+                log.debug('robots.txt collected with http status code' + \
+                        f' of {roboHTML.status_code}')
+                log.debug(f'Apparent encoding: {roboHTML.apparent_encoding}')
+
+                # Create new sets for processing
+                # This allows for better debugging messages
+                allow = set()
+                deny = set()
+
+                # Parse robots.txt looking for allow and deny values
+                for line in roboHTML.text.split('\n'):
+                    if line.upper().startswith('ALLOW'):
+                        log.debug(f'Found Allow Match: {line}')
+                        allow.add(base + line.split(' ')[1].lstrip('/'))
+
+                    elif line.upper().startswith('DISALLOW'):
+                        log.debug(f'Found Disallow Match: {line}')
+                        deny.add(base + line.split(' ')[1].lstrip('/'))
+                    else:
+                        log.debug(f'Robots line not matched: {line}')
+
+                log.debug(f'Robots.txt parsed for {base}')
+                log.debug(f'Robots.txt allow set for {base}: {allow}')
+                log.debug(f'Robots.txt deny set for {base}: {deny}')
+                
+                # Add all newly found entries to existing allow / deny sets
+                self.allow.update(allow)
+                self.deny.update(deny)
+
+        for url in self.queue:
+            if any(url.startswith(x) for x in self.allow):
+                log.debug(f'Found robot.txt permitted URL in queue: {url}')
+                continue 
+
+            elif any(url.startswith(x) for x in self.deny):
+                self.queue.remove(url)
+                log.debug('found and removed robots.txt banned URL in' +\
+                         f' queue: {url}')
         
-        # Request the robots.txt of the base URL
-        roboHTML = requests.get(base + 'robots.txt')
-            
-        log.debug('robots.txt collected with http status code' + \
-                f' of {roboHTML.status_code}')
-        log.debug(f'Apparent encoding: {roboHTML.apparent_encoding}')
-
-        allow = set()
-        deny = set()
-        
-        # Parse robots.txt looking for allow and deny values
-        for line in roboHTML.text:
-            if line.upper().startswith('ALLOW'):
-                allow.add(base + line.split(' ')[1])
-
-            elif line.upper().startswith('DISALLOW'):
-                deny.add(base + line.split(' ')[1])
-
-        log.debug(f'Robots.txt parsed for {base}')
-        log.debug(f'Robots.txt allow set for {base}: {allow}')
-        log.debug(f'Robots.txt deny set for {base}: {deny}')
-        
-        self.allow.update(allow)
-        self.deny.update(deny)
+        log.info(f'Finished robots.txt cleanup for layer {self.depth}')
 
         return None
 
@@ -263,13 +293,20 @@ class spider():
         return None
 
 
-    def auto(self, startURL):
+    def auto(self, startURL, max_depth=None):
         '''
         This block will automate the scraping process for an end user if
         desired, but a user can also use other methods in this class to 
         manually scrape or read html objects
+
+        Expects user to provide a starting URL and depth
+
+        Default depth is 2 layers but can be set to any intiger value
         '''
         self.currentURL = startURL
+
+        if max_depth != None:
+            self.maxdepth = max_depth
 
         again = True
 
@@ -280,7 +317,7 @@ class spider():
                 again = self.nextURL()
 
         except KeyboardInterrupt:
-            log.info('Keyboard Inturrupt. ' + \
+            log.info('Keyboard Interrupt. ' + \
                      'Stopping Spider and reporting findings')
             self.visited.update(self.queue)
             self.visited.update(self.nextqueue)
@@ -309,7 +346,20 @@ if __name__ == '__main__':
     # Spider instance for testing
     s = spider()
 
-    # for auto config and testing
-    # s.maxdepth = 5
-    # s.auto(startURL)
+    ########################
+    # Test Use Cases Below #
+    ########################
+
+    ###############################
+    # for auto config and testing #
+    ###############################
+
+    # s.auto(startURL) # Valid Paramaters: (Start URL, Max Depth)
+
+
+    #######################
+    # Robots text testing #
+    #######################
+    # NOTE This appears to not be finding rejected URLs, but is finding accepted URLS
+    s.queue = set([startURL] + ['https://google.com/cl2/ical/', 'https://google.com/shopping/product/', 'https://google.com/gallery/', 'https://google.com/maps/reserve/partner-dashboard', 'https://google.com/wapsearch?', 'https://google.com/local?'] + ['https://google.com/search/howsearchworks', 'https://google.com/?hl=', 'https://google.com/ebooks?*q=editions:*', 'https://google.com/alerts/manage', 'https://google.com/scholar_share', 'https://google.com/js/', 'https://google.com/maps?*file=', 'https://google.com/?gws_rd=ssl$', 'https://google.com/books?*zoom=5*', 'https://google.com/?pt1=true$', 'https://google.com/s2/static'])
     s.robot()
