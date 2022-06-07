@@ -148,7 +148,7 @@ class spider():
             self.queue -= self.visited
 
             # TODO also remove robots.txt values (see self.robot())
-            self.robot()
+            # self.robot()
 
             # prepare next URL for processing
             self.currentURL = self.queue.pop()
@@ -341,7 +341,7 @@ if __name__ == '__main__':
     logging.basicConfig(level='DEBUG')
 
     # Hardcode starting URL for testing
-    startURL = 'https://google.com'
+    startURL = 'https://example.com'
 
     # Spider instance for testing
     s = spider()
@@ -354,12 +354,14 @@ if __name__ == '__main__':
     # for auto config and testing #
     ###############################
 
-    # s.auto(startURL) # Valid Paramaters: (Start URL, Max Depth)
+    s.auto(startURL) # Valid Parameters: (Start URL, Max Depth)
 
 
     #######################
     # Robots text testing #
     #######################
+    '''
     # NOTE This appears to not be finding rejected URLs, but is finding accepted URLS
     s.queue = set([startURL] + ['https://google.com/cl2/ical/', 'https://google.com/shopping/product/', 'https://google.com/gallery/', 'https://google.com/maps/reserve/partner-dashboard', 'https://google.com/wapsearch?', 'https://google.com/local?'] + ['https://google.com/search/howsearchworks', 'https://google.com/?hl=', 'https://google.com/ebooks?*q=editions:*', 'https://google.com/alerts/manage', 'https://google.com/scholar_share', 'https://google.com/js/', 'https://google.com/maps?*file=', 'https://google.com/?gws_rd=ssl$', 'https://google.com/books?*zoom=5*', 'https://google.com/?pt1=true$', 'https://google.com/s2/static'])
     s.robot()
+'''
