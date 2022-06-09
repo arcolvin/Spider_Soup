@@ -341,7 +341,7 @@ if __name__ == '__main__':
     logging.basicConfig(level='DEBUG')
 
     # Hardcode starting URL for testing
-    startURL = 'https://example.com'
+    startURL = 'https://yahoo.com'
 
     # Spider instance for testing
     s = spider()
