@@ -49,7 +49,7 @@ class spider():
         # base URL for active HTML Object
         self.baseURL = ''
             # For robots.txt tracking
-            # Also for relative link buildout
+            # Also for relative link build out
         self.currentURL = ''
 
         log.debug('Spider initialized')
@@ -214,12 +214,12 @@ class spider():
 
         Expects an iterable set of URLs
         saves found robots exclusions to self.allow and self.deny
-        also curates the queue to elimitante denied paths
+        also curates the queue to eliminate denied paths
         '''
         # NOTE: Maybe put all queue base URLs in a temporary set to ensure
         #       we don't visit a given txt twice 
 
-        # Initialize queue if no paramater provided
+        # Initialize queue if no parameter provided
         if queue == None:
             queue = self.queue
 
