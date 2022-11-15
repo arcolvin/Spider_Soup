@@ -331,7 +331,7 @@ class spider():
 if __name__ == '__main__':
     # Driver code for local testing
     '''
-    Should be implimented into another script to match required processes
+    Should be implemented into another script to match required processes
     for the specified use case
 
     Default action is to do 2 layers of scraping for testing
