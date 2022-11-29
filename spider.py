@@ -36,7 +36,7 @@ class spider():
         self.nextqueue = set()
         # Processed URL list (for final Export)
         self.visited = set()
-        # Robots.txt deny set
+        # Robots.txt deny regex string set
         self.deny = set()
         # Robots.txt allow set
         self.allow = set()
@@ -51,6 +51,8 @@ class spider():
             # For robots.txt tracking
             # Also for relative link build out
         self.currentURL = ''
+        # Toggle for polite or rude spider (used in self.nextURL())
+        self.polite = True
 
         log.debug('Spider initialized')
         log.debug('Initial variable values:')
@@ -119,8 +121,8 @@ class spider():
 
             log.debug(f'Current Queue: {self.queue}')
             log.debug(f'Next Queue: {self.nextqueue}')
-            log.debug(f'Queue Legnth: {len(self.queue)}')
-            log.debug(f'Next Queue Legnth: {len(self.nextqueue)}')
+            log.debug(f'Queue Length: {len(self.queue)}')
+            log.debug(f'Next Queue Length: {len(self.nextqueue)}')
             log.debug(f'Current Depth: {self.depth}')
             log.debug(f'Max Depth: {self.maxdepth}')
 
@@ -147,8 +149,9 @@ class spider():
             # Remove visited URLs from current queue to avoid duplicate visits
             self.queue -= self.visited
 
-            # TODO also remove robots.txt values (see self.robot())
-            # self.robot()
+            # Remove robots.txt values for polite spiders
+            if self.polite:
+                self.robot()
 
             # prepare next URL for processing
             self.currentURL = self.queue.pop()
@@ -219,6 +222,7 @@ class spider():
         # NOTE: Maybe put all queue base URLs in a temporary set to ensure
         #       we don't visit a given txt twice 
 
+        # TODO: Add Sitemap and user agent compatibility
         # Initialize queue if no parameter provided
         if queue == None:
             queue = self.queue
@@ -234,7 +238,7 @@ class spider():
                 log.info(f'Requesting robots.txt for: {base}')
                 
                 # Request the robots.txt of the base URL
-                roboHTML = requests.get(base + 'robots.txt')
+                roboHTML = requests.get(f'{base}robots.txt')
                 self.roboVisited.add(base)
                     
                 log.debug('robots.txt collected with http status code' + \
@@ -246,15 +250,33 @@ class spider():
                 allow = set()
                 deny = set()
 
+                # Escape regex Chars that might show up in the URL
+                # Prepare the found line as a regex string for later matching
+                mkReg = lambda x: x.replace('.', '\.')\
+                    .replace('?', '\?')\
+                    .replace('*', '.*')\
+                    .replace('+', '\+')\
+                    .replace('$', '\$')\
+                    .replace('^', '\^')\
+                    .replace('&', '\&')\
+                    .replace('-', '\-')\
+                    .replace('|', '\|')
+
                 # Parse robots.txt looking for allow and deny values
                 for line in roboHTML.text.split('\n'):
-                    if line.upper().startswith('ALLOW'):
+                    try:
+                        rule, path = line.split()
+                    except ValueError:
+                        log.debug('Empty Line in robots.txt')
+                    path = path.lstrip('/')
+                    if rule.upper() == 'ALLOW:':
                         log.debug(f'Found Allow Match: {line}')
-                        allow.add(base + line.split(' ')[1].lstrip('/'))
+                        allow.add(f'({mkReg(base + path)})')
 
-                    elif line.upper().startswith('DISALLOW'):
+                    elif rule.upper() == 'DISALLOW:':
                         log.debug(f'Found Disallow Match: {line}')
-                        deny.add(base + line.split(' ')[1].lstrip('/'))
+                        deny.add(f'({mkReg(base + path)})')
+
                     else:
                         log.debug(f'Robots line not matched: {line}')
 
@@ -266,12 +288,16 @@ class spider():
                 self.allow.update(allow)
                 self.deny.update(deny)
 
-        for url in self.queue:
-            if any(url.startswith(x) for x in self.allow):
+        # Create a static set to iterate over since self.queue will likely
+        # change during this block of code
+        safeQueue = self.queue.copy()
+
+        for url in safeQueue:
+            if any(re.match(regex, url) for regex in self.allow):
                 log.debug(f'Found robot.txt permitted URL in queue: {url}')
                 continue 
 
-            elif any(url.startswith(x) for x in self.deny):
+            elif any(re.match(regex, url) for regex in self.deny):
                 self.queue.remove(url)
                 log.debug('found and removed robots.txt banned URL in' +\
                          f' queue: {url}')
@@ -285,7 +311,12 @@ class spider():
         '''
         Method to do final export of collected data
         '''
-        
+        '''
+        TODO: Make this name the file based on current time to avoid clobber.
+        If continuous reporting is needed, might need to create file at
+        beginning track filename and reuse as many times as needed until program
+        completion
+        '''
         with open('spiderURLs.txt', 'w') as f:
             for x in sorted(list(self.visited)):
                 f.write(x + '\n')
@@ -301,11 +332,13 @@ class spider():
 
         Expects user to provide a starting URL and depth
 
-        Default depth is 2 layers but can be set to any intiger value
+        Default depth is 2 layers but can be set to any integer value
         '''
         self.currentURL = startURL
 
         if max_depth != None:
+            # This allows the default value of 2 to be overridden if assigned
+            # Otherwise maxdepth will be 2
             self.maxdepth = max_depth
 
         again = True
@@ -334,7 +367,7 @@ if __name__ == '__main__':
     Should be implemented into another script to match required processes
     for the specified use case
 
-    Default action is to do 2 layers of scraping for testing
+    Default auto action is to do 2 layers of scraping for testing
     '''
     
     # Log to terminal for testing
@@ -354,14 +387,12 @@ if __name__ == '__main__':
     # for auto config and testing #
     ###############################
 
-    s.auto(startURL) # Valid Parameters: (Start URL, Max Depth)
+    # s.auto(startURL) # Valid Parameters for auto(): (Start URL, Max Depth)
 
 
     #######################
     # Robots text testing #
     #######################
-    '''
-    # NOTE This appears to not be finding rejected URLs, but is finding accepted URLS
-    s.queue = set([startURL] + ['https://google.com/cl2/ical/', 'https://google.com/shopping/product/', 'https://google.com/gallery/', 'https://google.com/maps/reserve/partner-dashboard', 'https://google.com/wapsearch?', 'https://google.com/local?'] + ['https://google.com/search/howsearchworks', 'https://google.com/?hl=', 'https://google.com/ebooks?*q=editions:*', 'https://google.com/alerts/manage', 'https://google.com/scholar_share', 'https://google.com/js/', 'https://google.com/maps?*file=', 'https://google.com/?gws_rd=ssl$', 'https://google.com/books?*zoom=5*', 'https://google.com/?pt1=true$', 'https://google.com/s2/static'])
+    # TODO: below google URL should be blocked but is showing as allowed
+    s.queue = set([startURL] + ['https://google.com/?hl=132&asdfaf&gws_rd=ssl'])
     s.robot()
-'''
