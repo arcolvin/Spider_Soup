@@ -254,7 +254,7 @@ class spider():
                 # Prepare the found line as a regex string for later matching
                 mkReg = lambda x: x.replace('.', '\.')\
                     .replace('?', '\?')\
-                    .replace('*', '.*')\
+                    .replace('*', '.*?')\
                     .replace('+', '\+')\
                     .replace('$', '\$')\
                     .replace('^', '\^')\
@@ -292,16 +292,33 @@ class spider():
         # change during this block of code
         safeQueue = self.queue.copy()
 
-        for url in safeQueue:
-            if any(re.match(regex, url) for regex in self.allow):
-                log.debug(f'Found robot.txt permitted URL in queue: {url}')
-                continue 
+        '''
+        # This is broken, It does not block removing an approved URL
+        for regex in self.allow:
+            for url in safeQueue:
+                if re.match(regex, url):
+                    log.debug(f'Found robot.txt permitted URL in queue: {url}')
+                    continue 
 
-            elif any(re.match(regex, url) for regex in self.deny):
+        for regex in self.deny:
+            for url in safeQueue:
                 self.queue.remove(url)
                 log.debug('found and removed robots.txt banned URL in' +\
                          f' queue: {url}')
-        
+        '''
+        # NOTE: This is allowing URLs through that should be blocked
+        # The ANY() function does not show what is matching so this will likely
+        # need to be reworked somehow so the regex can be better examined
+        for url in safeQueue:
+            if any(re.search(regex, url) for regex in self.allow):
+                log.debug(f'Found robot.txt permitted URL in queue: {url}')
+                continue 
+
+            elif any(re.search(regex, url) for regex in self.deny):
+                self.queue.remove(url)
+                log.debug('found and removed robots.txt banned URL in' +\
+                         f' queue: {url}')
+
         log.info(f'Finished robots.txt cleanup for layer {self.depth}')
 
         return None
