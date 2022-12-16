@@ -254,13 +254,17 @@ class spider():
                 # Prepare the found line as a regex string for later matching
                 mkReg = lambda x: x.replace('.', '\.')\
                     .replace('?', '\?')\
-                    .replace('*', '.*?')\
                     .replace('+', '\+')\
                     .replace('$', '\$')\
                     .replace('^', '\^')\
                     .replace('&', '\&')\
                     .replace('-', '\-')\
-                    .replace('|', '\|')
+                    .replace('|', '\|')\
+                    .replace('(', '\(')\
+                    .replace(')', '\)')\
+                    .replace('[', '\[')\
+                    .replace(']', '\]')\
+                    .replace('*', '.*')
 
                 # Parse robots.txt looking for allow and deny values
                 for line in roboHTML.text.split('\n'):
@@ -292,6 +296,7 @@ class spider():
         # change during this block of code
         safeQueue = self.queue.copy()
 
+        # NOTE: Robots Attempt 1
         '''
         # This is broken, It does not block removing an approved URL
         for regex in self.allow:
@@ -306,11 +311,29 @@ class spider():
                 log.debug('found and removed robots.txt banned URL in' +\
                          f' queue: {url}')
         '''
+        # NOTE: Robots Attempt 2 (sorta works)
+        '''
         # NOTE: This is allowing URLs through that should be blocked
         # The ANY() function does not show what is matching so this will likely
         # need to be reworked somehow so the regex can be better examined
         for url in safeQueue:
             if any(re.search(regex, url) for regex in self.allow):
+                log.debug(f'Found robot.txt permitted URL in queue: {url}')
+                continue 
+
+            elif any(re.search(regex, url) for regex in self.deny):
+                self.queue.remove(url)
+                log.debug('found and removed robots.txt banned URL in' +\
+                         f' queue: {url}')
+        '''
+        # NOTE: I think this is all dumb. I probably need to drop this into a function
+        # to keep it readable which is what i am trying to accomplish here so we
+        # dont end up with 7 layers of indentation
+
+        # NOTE: Robots attempt 3
+        # Maybe try for a intersection of two sets? if len intersection 0 no match?
+        for url in safeQueue:
+            if len: # TODO: Build logic to check wether the URL exists in two sets
                 log.debug(f'Found robot.txt permitted URL in queue: {url}')
                 continue 
 
