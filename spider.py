@@ -13,6 +13,7 @@ REGEX string to collect additional data.
 import logging
 import requests
 import re
+import time
 
 '''
 This allows for logs to work even if class is imported
@@ -53,6 +54,11 @@ class spider():
         self.currentURL = ''
         # Toggle for polite or rude spider (used in self.nextURL())
         self.polite = True
+        # Timer dictionary for per site crawl delay
+        # useful to not overwhelm some resource
+        # Keys should be the base URL for some site, value should be delay in
+        # seconds
+        self.delay = {'default': 0}
 
         log.debug('Spider initialized')
         log.debug('Initial variable values:')
@@ -67,6 +73,8 @@ class spider():
         log.debug(f'maxdepth: {self.maxdepth}')
         log.debug(f'baseURL: {self.baseURL}')
         log.debug(f'currentURL: {self.currentURL}')
+        log.debug(f'polite: {self.polite}')
+        log.debug(f'delay: {self.delay}')
 
 
     def crawl(self):
@@ -138,7 +146,7 @@ class spider():
 
         if self.queue == set():
             # Promote to next level when primary queue is empty
-            self.queue = self.nextqueue
+            self.queue = self.nextqueue.copy()
             self.nextqueue = set()
             self.depth += 1
 
@@ -152,9 +160,12 @@ class spider():
             # Remove robots.txt values for polite spiders
             if self.polite:
                 self.robot()
+                log.info('Polite Spider verified URLs in queue ' +
+                        f'against robots.txt after visiting {self.currentURL}')
 
             # prepare next URL for processing
             self.currentURL = self.queue.pop()
+            log.info(f'Next URL to visit: {self.currentURL}')
 
         except KeyError:
             log.info('Queue was empty when trying to increment. ' + \
@@ -175,7 +186,7 @@ class spider():
         expects a string returns a string
         '''
         # REGEX for base URL
-        base_R = r'((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:]+)\/?.*?' 
+        base_R = r'((?:https?|telnet|ldaps?|ftps?)\:\/\/[\w|\d|\.|\:|-]+)\/?.*?' 
 
         # rstrip a slash if it exists, then add one in
         # guarantees there is exactly one / on the base url for concatenation
@@ -190,7 +201,7 @@ class spider():
         returns a list of strings
         '''
         full_R = r'href=[\'\"]((?:https?|telnet|ldaps?|ftps?)' +\
-                 r'\:\/\/[\w|\d|\.|\:]+\/?.*?)[\'\"]'
+                 r'\:\/\/[\w|\d|\.|\:|-]+\/?.*?)[\'\"]'
 
         # Collect lists of all found full and relative URLS
         return re.findall(full_R, html)
@@ -204,7 +215,7 @@ class spider():
         '''
         # REGEX for relative URLs
         rel_R = r'href=[\'\"](?:(?!https?|telnet|ldaps?|ftps?))' +\
-                r'(\/?[\w|\d|\.]+)[\'\"]'
+                r'(\/?[\w|\d|\.|-]+)[\'\"]'
         
         return re.findall(rel_R, html)
 
@@ -219,11 +230,13 @@ class spider():
         saves found robots exclusions to self.allow and self.deny
         also curates the queue to eliminate denied paths
         '''
-        # NOTE: Maybe put all queue base URLs in a temporary set to ensure
-        #       we don't visit a given txt twice 
 
         # TODO: Add Sitemap and user agent compatibility
         # Initialize queue if no parameter provided
+
+        # TODO: Implement Crawl Delay per webpage request as seen on:
+        # https://www.icann.org/robots.txt (Crawl-delay: 10)
+
         if queue == None:
             queue = self.queue
 
@@ -275,11 +288,11 @@ class spider():
                     path = path.lstrip('/')
                     if rule.upper() == 'ALLOW:':
                         log.debug(f'Found Allow Match: {line}')
-                        allow.add(f'({mkReg(base + path)})')
+                        allow.add(re.compile(f'({mkReg(base + path)})'))
 
                     elif rule.upper() == 'DISALLOW:':
                         log.debug(f'Found Disallow Match: {line}')
-                        deny.add(f'({mkReg(base + path)})')
+                        deny.add(re.compile(f'({mkReg(base + path)})'))
 
                     else:
                         log.debug(f'Robots line not matched: {line}')
@@ -291,31 +304,12 @@ class spider():
                 # Add all newly found entries to existing allow / deny sets
                 self.allow.update(allow)
                 self.deny.update(deny)
+                log.debug(f'Current Allow List')
 
         # Create a static set to iterate over since self.queue will likely
         # change during this block of code
         safeQueue = self.queue.copy()
 
-        # NOTE: Robots Attempt 1
-        '''
-        # This is broken, It does not block removing an approved URL
-        for regex in self.allow:
-            for url in safeQueue:
-                if re.match(regex, url):
-                    log.debug(f'Found robot.txt permitted URL in queue: {url}')
-                    continue 
-
-        for regex in self.deny:
-            for url in safeQueue:
-                self.queue.remove(url)
-                log.debug('found and removed robots.txt banned URL in' +\
-                         f' queue: {url}')
-        '''
-        # NOTE: Robots Attempt 2 (sorta works)
-        '''
-        # NOTE: This is allowing URLs through that should be blocked
-        # The ANY() function does not show what is matching so this will likely
-        # need to be reworked somehow so the regex can be better examined
         for url in safeQueue:
             if any(re.search(regex, url) for regex in self.allow):
                 log.debug(f'Found robot.txt permitted URL in queue: {url}')
@@ -325,24 +319,12 @@ class spider():
                 self.queue.remove(url)
                 log.debug('found and removed robots.txt banned URL in' +\
                          f' queue: {url}')
-        '''
-        # NOTE: I think this is all dumb. I probably need to drop this into a function
-        # to keep it readable which is what i am trying to accomplish here so we
-        # dont end up with 7 layers of indentation
 
-        # NOTE: Robots attempt 3
-        # Maybe try for a intersection of two sets? if len intersection 0 no match?
-        for url in safeQueue:
-            if len: # TODO: Build logic to check wether the URL exists in two sets
-                log.debug(f'Found robot.txt permitted URL in queue: {url}')
-                continue 
+            else:
+                log.debug('URL Did not match any robots allow or deny. ' +\
+                         f'No action taken. URL: {url}')
 
-            elif any(re.search(regex, url) for regex in self.deny):
-                self.queue.remove(url)
-                log.debug('found and removed robots.txt banned URL in' +\
-                         f' queue: {url}')
-
-        log.info(f'Finished robots.txt cleanup for layer {self.depth}')
+        log.debug(f'Finished checking for robots.txt blocked URLs')
 
         return None
 
@@ -375,8 +357,10 @@ class spider():
         Default depth is 2 layers but can be set to any integer value
         '''
         self.currentURL = startURL
+        if self.polite is True:
+            self.delay['default'] = 1
 
-        if max_depth != None:
+        if max_depth is not None:
             # This allows the default value of 2 to be overridden if assigned
             # Otherwise maxdepth will be 2
             self.maxdepth = max_depth
@@ -385,6 +369,8 @@ class spider():
 
         try:
             while again:
+                time.sleep(self.delay.get(self.base(self.currentURL),\
+                    self.delay['default']))
                 self.crawl()
                 self.scrape()
                 again = self.nextURL()
@@ -411,10 +397,11 @@ if __name__ == '__main__':
     '''
     
     # Log to terminal for testing
+    # logging.basicConfig(level='DEBUG')
     logging.basicConfig(level='DEBUG')
 
     # Hardcode starting URL for testing
-    startURL = 'https://yahoo.com'
+    startURL = 'https://example.com'
 
     # Spider instance for testing
     s = spider()
@@ -427,12 +414,16 @@ if __name__ == '__main__':
     # for auto config and testing #
     ###############################
 
-    # s.auto(startURL) # Valid Parameters for auto(): (Start URL, Max Depth)
-
+    s.auto(startURL) # Valid Parameters for auto(): (Start URL, Max Depth)
 
     #######################
     # Robots text testing #
     #######################
-    # TODO: below google URL should be blocked but is showing as allowed
-    s.queue = set([startURL] + ['https://google.com/?hl=132&asdfaf&gws_rd=ssl'])
+    # The below URL with Allow should be permitted and deny should be blocked
+    
+    # Start URL should not match static assigned URL to make sure Robots
+    # function can extract the base URL to find the robots.txt correctly
+    '''
+    s.queue = set([startURL] + ['https://google.com/books?123zoom=5ALLOW', 'https://google.com/books?123zoom=DENY', 'https://yahoo.com'])
     s.robot()
+    '''
