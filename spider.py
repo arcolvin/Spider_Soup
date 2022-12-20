@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Version 1.1
+# Version 1.2
 '''
 This web spider will crawl the WWW and collect data as needed.
 
@@ -8,6 +8,13 @@ and save this to a local file.
 
 Future versions will grant an option for a user to provide a custom
 REGEX string to collect additional data.
+
+BUG: spider will crash if it runs into an untrusted or misconfigured certificate
+This can occur when the requests.get is called when pulling new HTML or the
+robots.txt
+Example Error Message:
+requests.exceptions.SSLError: HTTPSConnectionPool(host='fandomatic.com', port=443): Max retries exceeded with url: /robots.txt (Caused by SSLError(CertificateError("hostname 'fandomatic.com' doesn't match either of 'alberto.payzer.com', '*.alberto.payzer.com'")))
+
 '''
 
 import logging
@@ -220,6 +227,29 @@ class spider():
         return re.findall(rel_R, html)
 
 
+    def roboREGEX(self, baseURL, roboRule):
+        # Assemble rule from base URL and found robo rule
+        rawRule = baseURL + roboRule
+
+        # Escape regex Chars that might show up in the URL
+        # Prepare the found line as a regex string for later matching
+        escapedRule = rawRule.replace('.', '\.')\
+            .replace('?', '\?')\
+            .replace('+', '\+')\
+            .replace('$', '\$')\
+            .replace('^', '\^')\
+            .replace('&', '\&')\
+            .replace('-', '\-')\
+            .replace('|', '\|')\
+            .replace('(', '\(')\
+            .replace(')', '\)')\
+            .replace('[', '\[')\
+            .replace(']', '\]')\
+            .replace('*', '.*')
+
+        return re.compile(f'({escapedRule})')
+
+
     def robot(self, queue=None):
         '''
         Process to call in and remove robots.txt values from processing queue
@@ -256,6 +286,11 @@ class spider():
                     
                 log.debug('robots.txt collected with http status code' + \
                         f' of {roboHTML.status_code}')
+                if roboHTML.status_code >= 400:
+                    log.warning(f'{base} may not have a robots.txt! ' + \
+                        f'Connection returned status: {roboHTML.status_code}')
+                    continue
+
                 log.debug(f'Apparent encoding: {roboHTML.apparent_encoding}')
 
                 # Create new sets for processing
@@ -263,36 +298,23 @@ class spider():
                 allow = set()
                 deny = set()
 
-                # Escape regex Chars that might show up in the URL
-                # Prepare the found line as a regex string for later matching
-                mkReg = lambda x: x.replace('.', '\.')\
-                    .replace('?', '\?')\
-                    .replace('+', '\+')\
-                    .replace('$', '\$')\
-                    .replace('^', '\^')\
-                    .replace('&', '\&')\
-                    .replace('-', '\-')\
-                    .replace('|', '\|')\
-                    .replace('(', '\(')\
-                    .replace(')', '\)')\
-                    .replace('[', '\[')\
-                    .replace(']', '\]')\
-                    .replace('*', '.*')
-
                 # Parse robots.txt looking for allow and deny values
                 for line in roboHTML.text.split('\n'):
                     try:
                         rule, path = line.split()
+                        path = path.lstrip('/')
+
                     except ValueError:
                         log.debug('Empty Line in robots.txt')
-                    path = path.lstrip('/')
+                        continue
+
                     if rule.upper() == 'ALLOW:':
                         log.debug(f'Found Allow Match: {line}')
-                        allow.add(re.compile(f'({mkReg(base + path)})'))
+                        allow.add(self.roboREGEX(base, path))
 
                     elif rule.upper() == 'DISALLOW:':
                         log.debug(f'Found Disallow Match: {line}')
-                        deny.add(re.compile(f'({mkReg(base + path)})'))
+                        deny.add(self.roboREGEX(base, path))
 
                     else:
                         log.debug(f'Robots line not matched: {line}')
@@ -371,9 +393,14 @@ class spider():
             while again:
                 time.sleep(self.delay.get(self.base(self.currentURL),\
                     self.delay['default']))
+                log.info(f'Crawling {self.currentURL}')
                 self.crawl()
+                log.info(f'Scraping {self.currentURL}')
                 self.scrape()
                 again = self.nextURL()
+                log.info(f'Moving to next URL: {self.currentURL}')
+                log.info(f'Current Queue length: {len(self.queue)}')
+                log.info(f'Current Depth: {self.depth}, Max: {self.maxdepth}')
 
         except KeyboardInterrupt:
             log.info('Keyboard Interrupt. ' + \
@@ -398,10 +425,13 @@ if __name__ == '__main__':
     
     # Log to terminal for testing
     # logging.basicConfig(level='DEBUG')
-    logging.basicConfig(level='DEBUG')
+    logging.basicConfig(level='INFO')
 
     # Hardcode starting URL for testing
+    '''
     startURL = 'https://example.com'
+    '''
+    startURL = 'https://mmo-champion.com'
 
     # Spider instance for testing
     s = spider()
