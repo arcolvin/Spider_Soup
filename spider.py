@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Version 1.1
+# Version 1.2
 '''
 This web spider will crawl the WWW and collect data as needed.
 
