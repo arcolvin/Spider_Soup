@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Version 1.2
+# Version 1.3
 '''
 This web spider will crawl the WWW and collect data as needed.
 
@@ -267,7 +267,7 @@ class spider():
         # TODO: Implement Crawl Delay per webpage request as seen on:
         # https://www.icann.org/robots.txt (Crawl-delay: 10)
 
-        if queue == None:
+        if queue is None:
             queue = self.queue
 
         # Find base URL for element at hand
