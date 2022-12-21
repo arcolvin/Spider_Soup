@@ -267,7 +267,7 @@ class spider():
         # TODO: Implement Crawl Delay per webpage request as seen on:
         # https://www.icann.org/robots.txt (Crawl-delay: 10)
 
-        if queue == None:
+        if queue is None:
             queue = self.queue
 
         # Find base URL for element at hand
